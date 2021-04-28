@@ -1,6 +1,5 @@
-# Run this app with `python app.py` and
+# Run this app with `python <app_name>.py` and
 # visit http://127.0.0.1:8050/ in your web browser.
-
 
 import dash
 import dash_core_components as dcc
@@ -40,10 +39,10 @@ data = pd.DataFrame.from_records(results)
 cols = data.columns.tolist()
 df = data.iloc[:, :2]
 num_cols = cols[2:]
-for col in num_cols: 
+for col in num_cols:
     df[col] = pd.to_numeric(data[col])
-    
-# string test_date to datetime 
+
+# string test_date to datetime
 df['datetime'] = pd.to_datetime(df['test_date'])
 
 # set index to datetime
@@ -53,77 +52,84 @@ df.set_index('datetime', inplace=True)
 start_date = df.index[-1] - pd.tseries.offsets.DateOffset(months=3)
 subset = df[df.index > start_date]
 
-print(df.shape)
-print(subset.shape)
-# Data columns
-'''
-"test_date","county","new_positives","cumulative_number_of_positives","total_number_of_tests","cumulative_number_of_tests"
-'''
+# confirm data retrieved successfully
+print(f'Data retrieved {df.shape}')
+
+# Data columns "test_date","county","new_positives","cumulative_number_of_positives","total_number_of_tests","cumulative_number_of_tests"
 
 """
-Dash layout
+Create components for Dash layout
 """
 markdown_text = '''
 ## Covid-19 Chart 
 #### data source: [health.data.ny.gov](https://health.data.ny.gov/resource/xdss-u53e.csv)
 '''
-subset1 = subset[subset.index==subset.index[-1]].sort_values(by='county', ascending=True)
+# sorted data from the last date of sample
+subset1 = subset[subset.index == subset.index[-1]
+                 ].sort_values(by='county', ascending=True)
 
 fig1 = px.scatter(
-    subset1, 
-    x="cumulative_number_of_tests", 
+    subset1,
+    x="cumulative_number_of_tests",
     y="cumulative_number_of_positives", color="county",
-    hover_name="county", size="cumulative_number_of_positives", 
+    hover_name="county", size="cumulative_number_of_positives",
     size_max=60,
-    log_x=True, 
-    log_y=True, 
-    )
+    log_x=True,
+    log_y=True,
+)
 
+# Get names for dcc dropdown menu
 county_names = subset['county'].unique()
+print(county_names)
 
 app.layout = html.Div([
     html.P(
         children=dcc.Markdown(children=markdown_text)
-        ),
+    ),
 
     html.Div([
-        html.H4('Latest cumulative cases in New York State'),      
+        # title for the following graph
+        html.H4('Latest cumulative cases in New York State'),
+
         dcc.Graph(
             id='covid-cumulative-graph',
             figure=fig1
         ),
 
+        # title for the following graph
         html.H4('Latest new positives by county'),
+
         dcc.Dropdown(
             id='county-selected',
-            options=[{'label':i, 'value':i} for i in county_names],
-            value='St. Lawrence'
+            options=[{'label': i, 'value': i} for i in county_names],
+            multi=True,
+            value=['Albany', 'St. Lawrence']
         ),
 
         dcc.Graph(
-            id='covid-new-case-by-county'
+            id='new-case-county-graph'
         )
-        ]
-    )
+    ])
 ])
 
 @app.callback(
-    Output('covid-new-case-by-county', 'figure'),
-    Input('county-selected', 'value')
+    Output('new-case-county-graph', 'figure'),
+    [Input('county-selected', 'value')]
 )
-def update_graph(county_selected_name):
-    subset2 = subset[subset['county']==county_selected_name]
-    fig = px.scatter(
-        subset2, 
+def update_graph(selected_county):
+    subset2 = subset[subset['county'] == selected_county]
+    fig = px.bar(
+        subset2,
         x="test_date",
-        y="new_positives", 
+        y="new_positives",
+        color='county',
         hover_name="new_positives")
-        
+
     fig.update_layout(
         margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
-    
+
     return fig
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True) # hot reloading
+    app.run_server(debug=True)  # hot reloading
