@@ -64,7 +64,7 @@ print(subset.shape)
 Dash layout
 """
 markdown_text = '''
-## Covid-19 Chart by Blue Jay Analytics
+## Covid-19 Chart 
 #### data source: [health.data.ny.gov](https://health.data.ny.gov/resource/xdss-u53e.csv)
 '''
 subset1 = subset[subset.index==subset.index[-1]].sort_values(by='county', ascending=True)
