@@ -6,6 +6,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
 from dash.dependencies import Input, Output
+
 import pandas as pd
 from sodapy import Socrata
 from datetime import datetime
@@ -117,13 +118,16 @@ app.layout = html.Div([
     [Input('county-selected', 'value')]
 )
 def update_graph(selected_county):
-    subset2 = subset[subset['county'] == selected_county]
+    condition = subset['county'].isin(selected_county)
+    subset2 = subset[condition]
     fig = px.bar(
         subset2,
         x="test_date",
         y="new_positives",
         color='county',
-        hover_name="new_positives")
+        barmode='group',
+        opacity=0.9
+        )
 
     fig.update_layout(
         margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
