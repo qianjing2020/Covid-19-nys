@@ -11,6 +11,8 @@ import pandas as pd
 from sodapy import Socrata
 from datetime import datetime
 
+from urllib.request import urlopen
+import json
 
 """
 initiate dash app
@@ -22,21 +24,42 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 
 """
-get data 
+get geo data that contains counity boundaries
 """
-# data_url = "https://health.data.ny.gov/resource/xdss-u53e.csv?$where=test_date>'2021-01-10T12:00:00'"
-# df = pd.read_csv(data_url)
+with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
+    counties = json.load(response)
+#fips_df = pd.read_csv('county_fips.csv')
 
-# Unauthenticated client only works with public data sets. Note 'None'
-# in place of application token, and no username or password:
+"""
+get vaccination data - most recently updated county-level Covid vaccination data 
+"""
+API_KEY = "33ddf4c250b443a3b9b6f6117d867c25"
+data_URL = "https://api.covidactnow.org/v2/county/NY.csv?apiKey="+API_KEY
+
+data_vac = pd.read_csv(data_URL, dtype={"fips": str})
+
+vac_df = data_vac[['fips', 'county', 'state', 'population', 'actuals.cases', 'actuals.deaths', 'actuals.vaccinationsCompleted', 'metrics.vaccinationsCompletedRatio']]
+
+vac_df.columns=['FIPS', 'county', 'state', 'population', 'cases', 'deaths', 'vaccination completed', 'vaccination completed (%)']
+vac_df.iloc[:,-1]=vac_df.iloc[:,-1]*100
+vac_df.round(2)
+
+# print(vac_df.head())
+
+"""
+get Covid case time series data from NYS public health dept
+"""
 client = Socrata("health.data.ny.gov", None)
 
 results = client.get("xdss-u53e", limit=30000)
 
 # Convert data to pandas DataFrame
-# string to numbers
 data = pd.DataFrame.from_records(results)
 
+# confirm data retrieved successfully
+#print(f'Time series of covid case data retrieved {data.shape}')
+
+# Convert strings to numbers
 cols = data.columns.tolist()
 df = data.iloc[:, :2]
 num_cols = cols[2:]
@@ -49,22 +72,31 @@ df['datetime'] = pd.to_datetime(df['test_date'])
 # set index to datetime
 df.set_index('datetime', inplace=True)
 
-# create subset dataset for the latest 3 months
+# create subset dataset for last 3 months
 start_date = df.index[-1] - pd.tseries.offsets.DateOffset(months=3)
 subset = df[df.index > start_date]
 
-# confirm data retrieved successfully
-print(f'Data retrieved {df.shape}')
-
-# Data columns "test_date","county","new_positives","cumulative_number_of_positives","total_number_of_tests","cumulative_number_of_tests"
+#print(f'Time series of Covid case data: {subset.columns.tolist()}')
 
 """
 Create components for Dash layout
 """
-markdown_text = '''
-## Covid-19 Chart 
-#### data source: [health.data.ny.gov](https://health.data.ny.gov/resource/xdss-u53e.csv)
-'''
+y = vac_df['vaccination completed (%)']
+miny, maxy = y.min(), y.max()
+fig0 = px.choropleth_mapbox(
+        vac_df, geojson=counties, locations="FIPS",
+        hover_name = "county", 
+        hover_data = [ "population", "vaccination completed (%)"],
+        color='vaccination completed (%)',
+        range_color=(miny, maxy), 
+        mapbox_style="carto-positron",
+        opacity=0.6,
+        zoom=6, center={"lat": 43.2994, "lon":-74.2179},
+        labels={'Fully-vaccinated (%)': 'vaccination completed (%)'}
+        )
+fig0.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+
+
 # sorted data from the last date of sample
 subset1 = subset[subset.index == subset.index[-1]
                  ].sort_values(by='county', ascending=True)
@@ -84,22 +116,36 @@ county_names = subset['county'].unique()
 print(county_names)
 
 app.layout = html.Div([
-    html.P(
-        children=dcc.Markdown(children=markdown_text)
+    html.H1('Covid-19 Charts'),
+    
+    # # the next Div is for insert updated datetime
+    # html.Div([
+    #     html.Div(id='live-update-text',
+    #              style={'font-size': '10px'}),
+    #     dcc.Interval(
+    #         id='interval-component',
+    #         interval=1*1000,  # in milliseconds
+    #         n_intervals=3
+    #     )]), 
+
+    dcc.Markdown(
+        '''Data source: [health.data.ny.gov](https://health.data.ny.gov/resource/xdss-u53e.csv) and [Covid Act Now Org](https://api.covidactnow.org/)'''
     ),
-
+  
     html.Div([
-        # title for the following graph
-        html.H4('Latest cumulative cases in New York State'),
+        html.H4( "Vaccination Completeness:"),    
+        dcc.Graph(
+            id="vac-choropleth",
+            figure=fig0
+            ),
 
+        html.H4('Latest cumulative cases in New York State'),
         dcc.Graph(
             id='covid-cumulative-graph',
             figure=fig1
-        ),
+            ),
 
-        # title for the following graph
         html.H4('Latest new positives by county'),
-
         dcc.Dropdown(
             id='county-selected',
             options=[{'label': i, 'value': i} for i in county_names],
@@ -133,6 +179,12 @@ def update_graph(selected_county):
         margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
 
     return fig
+
+# # update text 
+# @app.callback(Output('live-update-text', 'children'),
+#               [Input('interval-component', 'n_intervals')])
+# def update_date(n):
+#       return [html.P('Last updated ' +str(datetime.datetime.now()))]
 
 
 if __name__ == '__main__':
