@@ -9,7 +9,7 @@ from dash.dependencies import Input, Output
 
 import pandas as pd
 from sodapy import Socrata
-from datetime import datetime
+from datetime import date
 
 from urllib.request import urlopen
 import json
@@ -115,37 +115,32 @@ fig1 = px.scatter(
 county_names = subset['county'].unique()
 print(county_names)
 
+title = 'Covid-19 Vaccination and Cases in NYS'
+timestamptxt = 'Updated on '+ date.today().strftime("%B %d, %Y")
+
 app.layout = html.Div([
-    html.H1('Covid-19 Charts'),
+    html.H1(title),
     
-    # # the next Div is for insert updated datetime
-    # html.Div([
-    #     html.Div(id='live-update-text',
-    #              style={'font-size': '10px'}),
-    #     dcc.Interval(
-    #         id='interval-component',
-    #         interval=1*1000,  # in milliseconds
-    #         n_intervals=3
-    #     )]), 
+    html.P(timestamptxt),
 
     dcc.Markdown(
         '''Data source: [health.data.ny.gov](https://health.data.ny.gov/resource/xdss-u53e.csv) and [Covid Act Now Org](https://api.covidactnow.org/)'''
     ),
   
     html.Div([
-        html.H4( "Vaccination Completeness:"),    
+        html.H4( "Fig 1. Vaccination Completeness in NYS counties"),    
         dcc.Graph(
             id="vac-choropleth",
             figure=fig0
             ),
 
-        html.H4('Latest cumulative cases in New York State'),
+        html.H4('Fig 2. Cumulative positive cases in NYS counties'),
         dcc.Graph(
             id='covid-cumulative-graph',
             figure=fig1
             ),
 
-        html.H4('Latest new positives by county'),
+        html.H4('Fig 3. New positive cases in selected counties'),
         dcc.Dropdown(
             id='county-selected',
             options=[{'label': i, 'value': i} for i in county_names],
