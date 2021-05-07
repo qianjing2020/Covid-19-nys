@@ -116,7 +116,7 @@ county_names = subset['county'].unique()
 print(county_names)
 
 title = 'Covid-19 Vaccination and Cases in NYS'
-timestamptxt = 'Updated on '+ date.today().strftime("%B %d, %Y")
+timestamptxt = 'Visualization by Blue Jay Analytics ' + date.today().strftime("%B %d, %Y")
 
 app.layout = html.Div([
     html.H1(title),
