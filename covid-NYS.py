@@ -14,6 +14,9 @@ from datetime import date
 from urllib.request import urlopen
 import json
 
+from settings import API_CAN
+
+
 """
 initiate dash app
 """
@@ -33,8 +36,7 @@ with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-c
 """
 get vaccination data - most recently updated county-level Covid vaccination data 
 """
-API_KEY = "33ddf4c250b443a3b9b6f6117d867c25"
-data_URL = "https://api.covidactnow.org/v2/county/NY.csv?apiKey="+API_KEY
+data_URL = "https://api.covidactnow.org/v2/county/NY.csv?apiKey="+ API_CAN
 
 data_vac = pd.read_csv(data_URL, dtype={"fips": str})
 
