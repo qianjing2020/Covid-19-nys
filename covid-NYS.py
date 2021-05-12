@@ -1,22 +1,19 @@
 # Run this app with `python <app_name>.py` and
 # visit http://127.0.0.1:8050/ in your web browser.
-
+import sys
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
 from dash.dependencies import Input, Output
-
 import pandas as pd
 from sodapy import Socrata
 from datetime import date
-
 from urllib.request import urlopen
 import json
-
 from settings import API_CAN
 
-
+pd.options.mode.chained_assignment = None  # default='warn'
 """
 initiate dash app
 """
@@ -38,12 +35,20 @@ get vaccination data - most recently updated county-level Covid vaccination data
 """
 data_URL = "https://api.covidactnow.org/v2/county/NY.csv?apiKey="+ API_CAN
 
-data_vac = pd.read_csv(data_URL, dtype={"fips": str})
+try:
+    data_vac = pd.read_csv(data_URL, dtype={"fips": str})
+    print('Vaccination data successfully retrieved!')
+except:
+    print('Upstream pipeline broke. Check vaccination data source.')
+    sys.exit()
 
 vac_df = data_vac[['fips', 'county', 'state', 'population', 'actuals.cases', 'actuals.deaths', 'actuals.vaccinationsCompleted', 'metrics.vaccinationsCompletedRatio']]
 
+# change column headers
 vac_df.columns=['FIPS', 'county', 'state', 'population', 'cases', 'deaths', 'vaccination completed', 'vaccination completed (%)']
+# change last col to percentage
 vac_df.iloc[:,-1]=vac_df.iloc[:,-1]*100
+# round all numerical values to 2 decimals
 vac_df.round(2)
 
 # print(vac_df.head())
@@ -51,25 +56,27 @@ vac_df.round(2)
 """
 get Covid case time series data from NYS public health dept
 """
-client = Socrata("health.data.ny.gov", None)
-
-results = client.get("xdss-u53e", limit=30000)
+try:
+    client = Socrata("health.data.ny.gov", None)
+    results = client.get("xdss-u53e", limit=30000)
+    print('Positive case data successfully retrieved!')
+except:
+    print('Upstream pipeline broke. Check Socrata API and NYS Dept of Public Health covid data source.')
+    sys.exit()
 
 # Convert data to pandas DataFrame
 data = pd.DataFrame.from_records(results)
 
-# confirm data retrieved successfully
-#print(f'Time series of covid case data retrieved {data.shape}')
-
 # Convert strings to numbers
 cols = data.columns.tolist()
+# create df for converted data
 df = data.iloc[:, :2]
 num_cols = cols[2:]
 for col in num_cols:
-    df[col] = pd.to_numeric(data[col])
+    df.loc[:, col] = pd.to_numeric(data.loc[:, col].values)
 
 # string test_date to datetime
-df['datetime'] = pd.to_datetime(df['test_date'])
+df.loc[:, 'datetime'] = pd.to_datetime(df.loc[:, 'test_date'].values)
 
 # set index to datetime
 df.set_index('datetime', inplace=True)
@@ -77,14 +84,14 @@ df.set_index('datetime', inplace=True)
 # create subset dataset for last 3 months
 start_date = df.index[-1] - pd.tseries.offsets.DateOffset(months=3)
 subset = df[df.index > start_date]
-
-#print(f'Time series of Covid case data: {subset.columns.tolist()}')
+print(f'Data cols: {subset.columns.tolist()}')
 
 """
 Create components for Dash layout
 """
 y = vac_df['vaccination completed (%)']
 miny, maxy = y.min(), y.max()
+
 fig0 = px.choropleth_mapbox(
         vac_df, geojson=counties, locations="FIPS",
         hover_name = "county", 
@@ -115,7 +122,7 @@ fig1 = px.scatter(
 
 # Get names for dcc dropdown menu
 county_names = subset['county'].unique()
-print(county_names)
+# print(county_names)
 
 title = 'Covid-19 Vaccination and Cases in NYS'
 timestamptxt = 'Blue Jay Analytics, ' + date.today().strftime("%B %d, %Y")
@@ -185,4 +192,4 @@ def update_graph(selected_county):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)  # hot reloading
+    app.run_server(debug=False)  # hot reloading
