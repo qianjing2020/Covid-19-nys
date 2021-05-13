@@ -1,1 +1,1 @@
-web: gunicorn covid-NYS:server
+web: gunicorn covid-NYS
