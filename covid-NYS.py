@@ -192,4 +192,4 @@ def update_graph(selected_county):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=False)  # hot reloading
+    app.run_server(debug=True)  # hot reloading
