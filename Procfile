@@ -1,1 +1,1 @@
-web: gunicorn bluejay-covid-nys:server
+web: gunicorn covid-NYS:server
